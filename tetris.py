@@ -1,4 +1,5 @@
 import pygame
+import random
 
 pygame.init()
 
@@ -12,6 +13,10 @@ grey=(128,128,128)
 red=(255,0,0)
 green=(0,255,0)
 blue=(0,0,255)
+purple=(255,0,255)
+cyan=(0,255,255)
+brown=(255,255,0)
+orange=(255,165,0)
 
 window_width=grid_size*grid_width
 window_length=grid_size*grid_length
@@ -19,23 +24,43 @@ window_length=grid_size*grid_length
 shapes={
     'I':[[1,1,1,1]],
     'O':[[1,1],[1,1]],
-    'T':[[0,1,0],[1,1,1]]
+    'T':[[0,1,0],[1,1,1]],
+    'L':[[1,0],[1,0],[1,1]],
+    'J':[[0,1],[0,1],[1,1]],
+    'S':[[0,1,1],[1,1,0]],
+    'Z':[[1,1,0],[0,1,1]]
 }
 
 colors={
     'I':red,
     'O':green,
-    'T':blue
+    'T':blue,
+    'L':brown,
+    'J':cyan,
+    'S':purple,
+    'Z':orange
 }
 
-current_piece='T'
-current_shape=shapes[current_piece]
-current_color=colors[current_piece]
-piecex=3
-piecey=0
+board=[[0]*grid_width for _ in range(grid_length)]
+
+def get_pieces():
+    piece=random.choice(list(shapes.keys()))
+    return {
+        'type':piece,
+        'shape':shapes[piece],
+        'color':colors[piece],
+        'x':grid_width//2-1,
+        'y':0
+    }
+
+current_piece=get_pieces()
 
 screen=pygame.display.set_mode((window_width,window_length))
 clock=pygame.time.Clock()
+
+fall_time=0
+fall_speed=500
+
 
 def check_position(shape,x,y):
     for row in range(len(shape)):
@@ -52,7 +77,34 @@ def check_position(shape,x,y):
                 
                 if gy>=grid_length:
                     return False
+
+                if gy>=0 and board[gy][gx]!=0:
+                    return False
     return True
+
+def lock_piece():
+    shape=current_piece['shape']
+    color=current_piece['color']
+    x=current_piece['x']
+    y=current_piece['y']
+
+    for row in range(len(shape)):
+        for col in range(len(shape[row])):
+            if shape[row][col]==1:
+                gx=x+col
+                gy=y+row
+                if gy >= 0 and gy < grid_length and gx >= 0 and gx < grid_width:
+                    board[gy][gx] = color
+
+def draw_board():
+    for row in range(grid_length):
+        for col in range(grid_width):
+            if board[row][col]!=0:
+                x=col*grid_size
+                y=row*grid_size
+
+                pygame.draw.rect(screen,board[row][col],(x,y,grid_size,grid_size))
+                pygame.draw.rect(screen,white,(x,y,grid_size,grid_size),2)
 
 def draw_grid():
     for x in range(grid_width+1):
@@ -62,17 +114,35 @@ def draw_grid():
         pygame.draw.line(screen,grey,(0,y*grid_size),(window_width,y*grid_size))
 
 def draw_tetromono():
-    for row in range(len(current_shape)):
-        for col in range(len(current_shape[row])):
-            if current_shape[row][col]==1:
+    shape=current_piece['shape']
+    piecex=current_piece['x']
+    piecey=current_piece['y']
+    for row in range(len(shape)):
+        for col in range(len(shape[row])):
+            if shape[row][col]==1:
                 x=(piecex+col)*grid_size
                 y=(piecey+row)*grid_size
-                pygame.draw.rect(screen,current_color,(x,y,grid_size,grid_size))
+                pygame.draw.rect(screen,current_piece['color'],(x,y,grid_size,grid_size))
                 pygame.draw.rect(screen,white,(x,y,grid_size,grid_size),2)
 
 running=True
 while running:
+    fall_time+=clock.get_rawtime()
     clock.tick(60)
+
+    x=current_piece['x']
+    y=current_piece['y']
+    shape=current_piece['shape']
+
+    if fall_time>=fall_speed:
+        fall_time=0
+
+        new=y+1
+        if check_position(shape,x,new):
+            current_piece['y']=new
+        else:
+            lock_piece()
+            current_piece=get_pieces()
 
     for event in pygame.event.get():
         if event.type==pygame.QUIT:
@@ -81,20 +151,21 @@ while running:
             if event.key==pygame.K_ESCAPE:
                 running=False
             if event.key==pygame.K_a:
-                new=piecex-1
-                if check_position(current_shape,new,piecey):
-                    piecex=new
+                new=x-1
+                if check_position(shape,new,y):
+                    current_piece['x']=new
             if event.key==pygame.K_s:
-                new=piecey+1
-                if check_position(current_shape,piecex,new):
-                    piecey=new
+                new=y+1
+                if check_position(shape,x,new):
+                    current_piece['y']=new
             if event.key==pygame.K_d:
-                new=piecex+1
-                if check_position(current_shape,new,piecey):
-                    piecex=new
+                new=x+1
+                if check_position(shape,new,y):
+                    current_piece['x']=new
     
     screen.fill(black)
     draw_grid()
+    draw_board()
     draw_tetromono()
     pygame.display.flip()
 
