@@ -43,6 +43,8 @@ colors={
 
 board=[[0]*grid_width for _ in range(grid_length)]
 
+game_over=False
+
 def get_pieces():
     piece=random.choice(list(shapes.keys()))
     return {
@@ -58,15 +60,15 @@ current_piece=get_pieces()
 screen=pygame.display.set_mode((window_width,window_length))
 clock=pygame.time.Clock()
 
-font=pygame.font.Font(None,32)
+font=pygame.font.Font(None,36)
 small_font=pygame.font.Font(None,24)
+big_font=pygame.font.Font(None,72)
 
 score=0
 top_score=0
 
 fall_time=0
-fall_speed=500
-
+fall_speed=250
 
 def check_position(shape,x,y):
     for row in range(len(shape)):
@@ -123,11 +125,13 @@ def draw_tetromono():
     shape=current_piece['shape']
     piecex=current_piece['x']
     piecey=current_piece['y']
+
     for row in range(len(shape)):
         for col in range(len(shape[row])):
             if shape[row][col]==1:
                 x=(piecex+col)*grid_size
                 y=(piecey+row)*grid_size
+
                 pygame.draw.rect(screen,current_piece['color'],(x,y,grid_size,grid_size))
                 pygame.draw.rect(screen,white,(x,y,grid_size,grid_size),2)
 
@@ -135,6 +139,7 @@ def clear_rows():
     global board,score
     rows_cleared=0
     row=grid_length-1
+
     while row>=0:
         if all(board[row][col]!=0 for col in range(grid_width)):
             rows_cleared+=1
@@ -143,39 +148,84 @@ def clear_rows():
             board.insert(0,[0]*grid_width)
         else:
             row-=1
+
     if rows_cleared>0:
         points={1:100,2:300,3:500,4:800}
         score+=points.get(rows_cleared,rows_cleared*100)
+
     return rows_cleared
 
 
 def draw_score():
     score_text=font.render(f"Score:{score}",True,white)
     screen.blit(score_text,(10,10))
+
     top_text=small_font.render(f'Top:{top_score}',True,brown)
     screen.blit(top_text,(10,50))
+
+def piece_rotation(shape):
+    rows=len(shape)
+    cols=len(shape[0])
+
+    rotated=[]
+    for col in range(cols):
+        new_row=[]
+        for row in range(rows):
+            new_row.append(shape[row][col])
+        rotated.append(new_row)
+
+def draw_game_over():
+    overlay=pygame.Surface((window_width,window_length))
+    overlay.set_alpha(200)
+    overlay.fill(black)
+    screen.blit(overlay,(0,0))
+
+    game_over_text=big_font.render("Game Over!",True,red)
+    text_rect=game_over_text.get_rect(center=(window_width//2,window_length//2-50))
+    screen.blit(game_over_text,text_rect)
+
+    score_text=font.render(f"Final score:{score}",True,white)
+    score_rect=score_text.get_rect(center=(window_width//2,window_length//2+20))
+    screen.blit(score_text,score_rect)
+
+    restart_text=small_font.render("Press R to restart",True,brown)
+    restart_rect=restart_text.get_rect(center=(window_width//2,window_length//2+60))
+    screen.blit(restart_text,restart_rect)
+
+def restart_game():
+    global score,board,fall_time,game_over,current_piece
+    board=[[0]*grid_width for _ in range(grid_length)]
+    fall_time=0
+    game_over=False
+    current_piece=get_pieces()
+    score=0
 
 running=True
 while running:
     fall_time+=clock.get_rawtime()
     clock.tick(60)
 
-    x=current_piece['x']
-    y=current_piece['y']
-    shape=current_piece['shape']
+    if not game_over:
+        x=current_piece['x']
+        y=current_piece['y']
+        shape=current_piece['shape']
 
-    if fall_time>=fall_speed:
-        fall_time=0
+        if fall_time>=fall_speed:
+            fall_time=0
 
-        new=y+1
-        if check_position(shape,x,new):
-            current_piece['y']=new
-        else:
-            lock_piece()
-            cleared=clear_rows()
-            if score>top_score:
-                top_score=score
-            current_piece=get_pieces()
+            new=y+1
+            if check_position(shape,x,new):
+                current_piece['y']=new
+            else:
+                lock_piece()
+                clear_rows()
+
+                if score>top_score:
+                    top_score=score
+                current_piece=get_pieces()
+
+                if not check_position(current_piece['shape'],current_piece['x'],current_piece['y']):
+                    game_over=True
 
     for event in pygame.event.get():
         if event.type==pygame.QUIT:
@@ -183,26 +233,38 @@ while running:
         if event.type==pygame.KEYDOWN:
             if event.key==pygame.K_ESCAPE:
                 running=False
-            if event.key==pygame.K_a:
-                new=x-1
-                if check_position(shape,new,y):
-                    current_piece['x']=new
-            if event.key==pygame.K_s:
-                new=y+1
-                if check_position(shape,x,new):
-                    current_piece['y']=new
-            if event.key==pygame.K_d:
-                new=x+1
-                if check_position(shape,new,y):
-                    current_piece['x']=new
-            if event.key==pygame.K_SPACE:
-                while check_position(shape,current_piece['x'],current_piece['y']+1):
-                    current_piece['y']+=1
+
+            if event.key==pygame.K_r:
+                restart_game()
+            
+            if not game_over:
+                if event.key==pygame.K_a or event.key==pygame.K_LEFT:
+                    new=x-1
+                    if check_position(shape,new,y):
+                        current_piece['x']=new
+                if event.key==pygame.K_s or event.key==pygame.K_DOWN:
+                    new=y+1
+                    if check_position(shape,x,new):
+                        current_piece['y']=new
+                if event.key==pygame.K_d or event.key==pygame.K_RIGHT:
+                    new=x+1
+                    if check_position(shape,new,y):
+                        current_piece['x']=new
+                if event.key==pygame.K_w or event.key==pygame.K_UP:
+                    rotated_shape=piece_rotation(shape)
+                    if check_position(rotated_shape,x,y):
+                        current_piece['shape']=rotated_shape
+                if event.key==pygame.K_SPACE:
+                    while check_position(shape,current_piece['x'],current_piece['y']+1):
+                        current_piece['y']+=1
     
     screen.fill(black)
     draw_grid()
     draw_board()
-    draw_tetromono()
+    if not game_over:
+        draw_tetromono()
+    else:
+        draw_game_over()
     draw_score()
     pygame.display.flip()
 
