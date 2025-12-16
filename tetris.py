@@ -58,6 +58,12 @@ current_piece=get_pieces()
 screen=pygame.display.set_mode((window_width,window_length))
 clock=pygame.time.Clock()
 
+font=pygame.font.Font(None,32)
+small_font=pygame.font.Font(None,24)
+
+score=0
+top_score=0
+
 fall_time=0
 fall_speed=500
 
@@ -125,6 +131,30 @@ def draw_tetromono():
                 pygame.draw.rect(screen,current_piece['color'],(x,y,grid_size,grid_size))
                 pygame.draw.rect(screen,white,(x,y,grid_size,grid_size),2)
 
+def clear_rows():
+    global board,score
+    rows_cleared=0
+    row=grid_length-1
+    while row>=0:
+        if all(board[row][col]!=0 for col in range(grid_width)):
+            rows_cleared+=1
+            del board[row]
+
+            board.insert(0,[0]*grid_width)
+        else:
+            row-=1
+    if rows_cleared>0:
+        points={1:100,2:300,3:500,4:800}
+        score+=points.get(rows_cleared,rows_cleared*100)
+    return rows_cleared
+
+
+def draw_score():
+    score_text=font.render(f"Score:{score}",True,white)
+    screen.blit(score_text,(10,10))
+    top_text=small_font.render(f'Top:{top_score}',True,brown)
+    screen.blit(top_text,(10,50))
+
 running=True
 while running:
     fall_time+=clock.get_rawtime()
@@ -142,6 +172,9 @@ while running:
             current_piece['y']=new
         else:
             lock_piece()
+            cleared=clear_rows()
+            if score>top_score:
+                top_score=score
             current_piece=get_pieces()
 
     for event in pygame.event.get():
@@ -162,11 +195,15 @@ while running:
                 new=x+1
                 if check_position(shape,new,y):
                     current_piece['x']=new
+            if event.key==pygame.K_SPACE:
+                while check_position(shape,current_piece['x'],current_piece['y']+1):
+                    current_piece['y']+=1
     
     screen.fill(black)
     draw_grid()
     draw_board()
     draw_tetromono()
+    draw_score()
     pygame.display.flip()
 
 pygame.quit()
